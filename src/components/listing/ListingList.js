@@ -1,31 +1,26 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ListingCard from './ListingCard';
-import { getAdminPropertiesPost } from '../../api/listingsApi';
+import { getListings } from '../../api/listingsApi';
 
 const PER_PAGE = 15;
 
 /**
- * ListingList: pagination + params (property_type_id=1, city_code=PP016) + response display.
+ * ListingList: load AI listings and paginate on frontend.
  */
 function ListingList() {
+  const [allListings, setAllListings] = useState([]);
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [response, setResponse] = useState(null);
 
-  const fetchListings = useCallback(async (page = 1) => {
+  const fetchListings = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await getAdminPropertiesPost({
-        current_page: page,
-        per_page: PER_PAGE,
-        property_type_id: 1,
-        city_code: 'PP016',
-      });
-      setListings(Array.isArray(result?.data) ? result.data : []);
-      setResponse(result);
+      const result = await getListings();
+      const list = Array.isArray(result?.data) ? result.data : [];
+      setAllListings(list);
     } catch (err) {
       const message =
         err.response?.data?.message ||
@@ -33,19 +28,30 @@ function ListingList() {
         err.message ||
         'Failed to load listings.';
       setError(message);
+      setAllListings([]);
       setListings([]);
-      setResponse(null);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchListings(currentPage);
-  }, [currentPage, fetchListings]);
+    fetchListings();
+  }, [fetchListings]);
 
-  const lastPage = response?.last_page ?? 1;
-  const total = response?.count ?? response?.total ?? 0;
+  const total = allListings.length;
+  const lastPage = Math.max(1, Math.ceil((total || 0) / PER_PAGE));
+
+  useEffect(() => {
+    const start = (currentPage - 1) * PER_PAGE;
+    setListings(allListings.slice(start, start + PER_PAGE));
+  }, [allListings, currentPage]);
+
+  useEffect(() => {
+    if (currentPage > lastPage) {
+      setCurrentPage(lastPage);
+    }
+  }, [currentPage, lastPage]);
 
   if (error) {
     return (
@@ -69,41 +75,32 @@ function ListingList() {
         )}
       </div>
 
-      {response && (
+      {total > 0 && (
         <>
           <nav className="listing-list__pagination" aria-label="Listings pagination">
             <button
               type="button"
               className="listing-list__page-btn"
               disabled={currentPage <= 1 || loading}
-              onClick={() => setCurrentPage((p) => p - 1)}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             >
               Previous
             </button>
             <span className="listing-list__page-info">
               Page {currentPage} of {lastPage}
+              {total > 0 && (
+                <span className="listing-list__total"> ({total} total)</span>
+              )}
             </span>
             <button
               type="button"
               className="listing-list__page-btn"
               disabled={currentPage >= lastPage || loading}
-              onClick={() => setCurrentPage((p) => p + 1)}
+              onClick={() => setCurrentPage((p) => Math.min(lastPage, p + 1))}
             >
               Next
             </button>
           </nav>
-
-          <div className="listing-list__response">
-            <p className="listing-list__api-hint">
-              {listings.length} on this page · {total} total from API.
-            </p>
-            <details className="listing-list__response-details">
-              <summary>Response</summary>
-              <pre className="listing-list__response-json">
-                {JSON.stringify(response.response || response, null, 2)}
-              </pre>
-            </details>
-          </div>
         </>
       )}
     </div>

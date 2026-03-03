@@ -11,6 +11,12 @@ const PROPERTY_TYPES = [
   { value: 'commercial', label: 'Commercial' },
 ];
 
+const CATEGORY_OPTIONS = [
+  { value: 'house', label: 'House' },
+  { value: 'plot', label: 'Plot' },
+  { value: 'flat', label: 'Flat' },
+];
+
 const PURPOSES = [
   { value: 'sale', label: 'Sale' },
   { value: 'rent', label: 'Rent' },
@@ -27,6 +33,7 @@ const INITIAL_FORM = {
   title: '',
   description: '',
   property_type: 'house',
+  category: 'house',
   purpose: 'sale',
   city: '',
   area: '',
@@ -53,17 +60,33 @@ function ListingForm() {
 
   const validate = () => {
     const next = {};
+    if (!form.user_id) next.user_id = 'User ID is required.';
     if (!form.title.trim()) next.title = 'Title is required.';
     if (!form.description.trim()) next.description = 'Description is required.';
     if (form.description.trim().length < 100)
       next.description = 'Description must be at least 100 characters.';
+    if (!form.city.trim()) next.city = 'City is required.';
+    if (!form.property_type) next.property_type = 'Property type is required.';
+    if (!form.category) next.category = 'Category is required.';
     if (form.price === '' || form.price === null || form.price === undefined)
       next.price = 'Price is required.';
     if (Number(form.price) < 0) next.price = 'Price must be a positive number.';
+    if (form.size !== '' && Number(form.size) <= 0) next.size = 'Size must be greater than 0.';
+    if (form.size === '' && !form.area.trim())
+      next.area = 'Area is required if size is not provided.';
     if (images.length < MIN_IMAGES)
       next.images = `At least ${MIN_IMAGES} images are required.`;
     setErrors(next);
     return Object.keys(next).length === 0;
+  };
+
+  const toMarla = (size, unit) => {
+    const n = Number(size);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    if (unit === 'marla') return n;
+    if (unit === 'kanal') return n * 20;
+    if (unit === 'sqft') return n / 272.25;
+    return null;
   };
 
   const buildFormData = () => {
@@ -72,12 +95,15 @@ function ListingForm() {
     fd.append('title', form.title.trim());
     fd.append('description', form.description.trim());
     fd.append('property_type', form.property_type);
+    fd.append('category', form.category);
     fd.append('purpose', form.purpose);
     fd.append('city', form.city.trim());
     if (form.area) fd.append('area', form.area.trim());
     fd.append('price', form.price);
     if (form.size !== '') fd.append('size', form.size);
     fd.append('size_unit', form.size_unit);
+    const areaMarla = toMarla(form.size, form.size_unit);
+    if (areaMarla != null) fd.append('area_marla', String(areaMarla));
     if (form.bedrooms !== '') fd.append('bedrooms', form.bedrooms);
     if (form.bathrooms !== '') fd.append('bathrooms', form.bathrooms);
     images.forEach((file, i) => fd.append(`images[${i}]`, file));
@@ -186,7 +212,9 @@ function ListingForm() {
           </div>
           <div className="listing-form__row listing-form__row--inline">
             <div className="listing-form__field">
-              <label className="listing-form__label">Property type</label>
+              <label className="listing-form__label">
+                Property type <span className="listing-form__required">*</span>
+              </label>
               <select
                 name="property_type"
                 className="listing-form__input listing-form__select"
@@ -198,6 +226,28 @@ function ListingForm() {
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
+              {errors.property_type && (
+                <span className="listing-form__error">{errors.property_type}</span>
+              )}
+            </div>
+            <div className="listing-form__field">
+              <label className="listing-form__label">
+                Category <span className="listing-form__required">*</span>
+              </label>
+              <select
+                name="category"
+                className="listing-form__input listing-form__select"
+                value={form.category}
+                onChange={(e) => update('category', e.target.value)}
+                disabled={submitting}
+              >
+                {CATEGORY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              {errors.category && (
+                <span className="listing-form__error">{errors.category}</span>
+              )}
             </div>
             <div className="listing-form__field">
               <label className="listing-form__label">Purpose</label>
@@ -231,7 +281,9 @@ function ListingForm() {
               {errors.city && <span className="listing-form__error">{errors.city}</span>}
             </div>
             <div className="listing-form__field">
-              <label className="listing-form__label">Area</label>
+              <label className="listing-form__label">
+                Area / locality {form.size === '' && <span className="listing-form__required">*</span>}
+              </label>
               <input
                 type="text"
                 name="area"
@@ -241,6 +293,7 @@ function ListingForm() {
                 placeholder="Area / locality"
                 disabled={submitting}
               />
+              {errors.area && <span className="listing-form__error">{errors.area}</span>}
             </div>
           </div>
           <div className="listing-form__row listing-form__row--inline">
@@ -263,7 +316,7 @@ function ListingForm() {
               )}
             </div>
             <div className="listing-form__field">
-              <label className="listing-form__label">Size</label>
+              <label className="listing-form__label">Size (for area_marla)</label>
               <input
                 type="number"
                 name="size"
@@ -274,6 +327,7 @@ function ListingForm() {
                 placeholder="0"
                 disabled={submitting}
               />
+              {errors.size && <span className="listing-form__error">{errors.size}</span>}
             </div>
             <div className="listing-form__field">
               <label className="listing-form__label">Size unit</label>

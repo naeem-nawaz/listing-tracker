@@ -1,18 +1,29 @@
 import React from 'react';
 
 /**
- * Action buttons for a fraud review row: View, Approve, Block.
- * Wired to API via parent (approveListing, blockListing).
+ * Action buttons for a fraud review row: View, Approve, Reject, Limited visibility.
+ * AI: auto approve, reject (not block), limited visibility – check if something is wrong.
  */
-function FraudActions({ listingId, onView, onApprove, onBlock, disabled = false, loading = false }) {
+function FraudActions({
+  listingId,
+  onView,
+  onApprove,
+  onReject,
+  onLimitedVisibility,
+  disabled = false,
+  loading = false,
+}) {
   const handleView = () => {
     if (typeof onView === 'function') onView(listingId);
   };
   const handleApprove = () => {
     if (typeof onApprove === 'function') onApprove(listingId);
   };
-  const handleBlock = () => {
-    if (typeof onBlock === 'function') onBlock(listingId);
+  const handleReject = () => {
+    if (typeof onReject === 'function') onReject(listingId);
+  };
+  const handleLimitedVisibility = () => {
+    if (typeof onLimitedVisibility === 'function') onLimitedVisibility(listingId);
   };
 
   return (
@@ -37,12 +48,21 @@ function FraudActions({ listingId, onView, onApprove, onBlock, disabled = false,
       </button>
       <button
         type="button"
-        className="fraud-actions__btn fraud-actions__btn--block"
-        onClick={handleBlock}
-        title="Block listing"
+        className="fraud-actions__btn fraud-actions__btn--reject"
+        onClick={handleReject}
+        title="Reject listing"
         disabled={disabled}
       >
-        {loading ? '…' : 'Block'}
+        {loading ? '…' : 'Reject'}
+      </button>
+      <button
+        type="button"
+        className="fraud-actions__btn fraud-actions__btn--limited"
+        onClick={handleLimitedVisibility}
+        title="Limited visibility – check if something is wrong"
+        disabled={disabled}
+      >
+        {loading ? '…' : 'Limited visibility'}
       </button>
     </div>
   );

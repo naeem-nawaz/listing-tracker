@@ -39,7 +39,7 @@
   margin: 0;
 }
 
-/* ---- Action message (approve/block success or error) ---- */
+/* ---- Action message (approve/reject/limited visibility success or error) ---- */
 .fraud-review-message {
   padding: 0.75rem 1rem;
   border-radius: 8px;
@@ -237,13 +237,22 @@
   background: #a7f3d0;
 }
 
-.fraud-actions__btn--block {
+.fraud-actions__btn--reject {
   background: #fee2e2;
   color: #991b1b;
 }
 
-.fraud-actions__btn--block:hover {
+.fraud-actions__btn--reject:hover {
   background: #fecaca;
+}
+
+.fraud-actions__btn--limited {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.fraud-actions__btn--limited:hover {
+  background: #fde68a;
 }
 
 /* ---- Empty state ---- */

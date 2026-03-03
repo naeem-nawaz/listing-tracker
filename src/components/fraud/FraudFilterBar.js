@@ -4,8 +4,8 @@ const STATUS_OPTIONS = [
   { value: '', label: 'All' },
   { value: 'approved', label: 'Approved' },
   { value: 'pending_ai_review', label: 'Pending Review' },
-  { value: 'limited_visibility', label: 'Limited Visibility' },
-  { value: 'blocked', label: 'Blocked' },
+  { value: 'check_something_wrong', label: 'Check Something Wrong' },
+  { value: 'rejected', label: 'Rejected' },
 ];
 
 function FraudFilterBar({ value, onChange, disabled }) {

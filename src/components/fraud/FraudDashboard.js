@@ -10,12 +10,20 @@ function computeStats(list) {
     total: list.length,
     approved: 0,
     pending_ai_review: 0,
-    limited_visibility: 0,
-    blocked: 0,
+    check_something_wrong: 0,
+    rejected: 0,
   };
   list.forEach((item) => {
-    const s = item.ai_status;
-    if (s && stats[s] !== undefined) stats[s]++;
+    const s = item.ai_status || 'pending_ai_review';
+    if (s === 'limited_visibility') {
+      stats.check_something_wrong++;
+    } else if (s === 'blocked') {
+      stats.rejected++;
+    } else if (stats[s] !== undefined) {
+      stats[s]++;
+    } else {
+      stats.pending_ai_review++;
+    }
   });
   return stats;
 }
@@ -28,15 +36,13 @@ function FraudDashboard() {
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedListing, setSelectedListing] = useState(null);
 
-  const fetchData = useCallback(async (status = null) => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await getListings(status || undefined);
-      const data = result?.data ?? [];
-      const list = Array.isArray(data) ? data : [];
-      setListings(list);
-      if (!status) setAllListings(list);
+      const result = await getListings();
+      const list = Array.isArray(result?.data) ? result.data : [];
+      setAllListings(list);
     } catch (err) {
       const message =
         err.response?.data?.message ||
@@ -44,15 +50,34 @@ function FraudDashboard() {
         err.message ||
         'Failed to load listings.';
       setError(message);
-      setListings([]);
+      setAllListings([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchData(selectedStatus || null);
-  }, [selectedStatus, fetchData]);
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    if (selectedStatus) {
+      setListings(
+        allListings.filter((item) => {
+          const status = item.ai_status || 'pending_ai_review';
+          if (selectedStatus === 'check_something_wrong') {
+            return status === 'check_something_wrong' || status === 'limited_visibility';
+          }
+          if (selectedStatus === 'rejected') {
+            return status === 'rejected' || status === 'blocked';
+          }
+          return status === selectedStatus;
+        })
+      );
+    } else {
+      setListings(allListings);
+    }
+  }, [allListings, selectedStatus]);
 
   const handleFilterChange = (value) => {
     setSelectedStatus(value);

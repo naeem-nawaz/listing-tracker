@@ -4,8 +4,8 @@ const STATS = [
   { key: 'total', label: 'Total Listings', className: 'fraud-stats-card fraud-stats-card--total' },
   { key: 'approved', label: 'Approved', className: 'fraud-stats-card fraud-stats-card--approved' },
   { key: 'pending_ai_review', label: 'Pending Review', className: 'fraud-stats-card fraud-stats-card--pending' },
-  { key: 'limited_visibility', label: 'Limited Visibility', className: 'fraud-stats-card fraud-stats-card--limited' },
-  { key: 'blocked', label: 'Blocked', className: 'fraud-stats-card fraud-stats-card--blocked' },
+  { key: 'check_something_wrong', label: 'Check Something Wrong', className: 'fraud-stats-card fraud-stats-card--limited' },
+  { key: 'rejected', label: 'Rejected', className: 'fraud-stats-card fraud-stats-card--rejected' },
 ];
 
 function FraudStatsCards({ counts = {} }) {

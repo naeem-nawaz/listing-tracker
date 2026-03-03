@@ -15,13 +15,28 @@ const PROPERTIES_API_BASE =
 // Admin backend: user properties list – POST /api/properties (Laravel properties() method)
 const PROPERTIES_POST_URL = (PROPERTIES_API_BASE || '') + '/api/properties';
 
-/** Normalize item: backend may send property_title/fraud_status etc., we use title/ai_status in UI */
+/** Normalize item: Pakistan Property API (data.properties) + common keys for UI + AI/fraud fields */
 function normalizeProperty(item) {
   if (!item || typeof item !== 'object') return item;
+  const title = item.title ?? item.property_title ?? item.name ?? item.slug?.replace(/-/g, ' ') ?? '';
+  const city = item.city ?? item.city_name ?? item.location?.name ?? item.location?.city ?? item.city_code ?? '';
+  const price = item.price ?? item.list_price ?? item.amount ?? item.total_price ?? '';
+  const riskReason = item.risk_reason_json ?? item.risk_reasons ?? item.risk_reason ?? item.reasoning;
+  const rawStatus = item.ai_status ?? item.fraud_status ?? 'pending_ai_review';
+  const normalizedStatus =
+    rawStatus === 'limited_visibility'
+      ? 'check_something_wrong'
+      : rawStatus === 'blocked'
+      ? 'rejected'
+      : rawStatus;
   return {
     ...item,
-    title: item.title ?? item.property_title ?? item.name ?? '',
-    ai_status: item.ai_status ?? item.fraud_status ?? item.status ?? item.ai_status,
+    title: typeof title === 'string' ? title : String(title || ''),
+    city: typeof city === 'string' ? city : (city?.name ?? ''),
+    price,
+    ai_status: normalizedStatus,
+    fraud_score: item.fraud_score,
+    risk_reason_json: typeof riskReason === 'object' ? riskReason : (riskReason ? { reasoning: riskReason } : undefined),
   };
 }
 
@@ -43,7 +58,7 @@ export async function submitListing(payload) {
 
 /**
  * Fetch all listings with AI status and fraud info.
- * GET /api/listings or GET /api/listings?status=approved|blocked|pending_ai_review|limited_visibility
+ * GET /api/listings or GET /api/listings?status=approved|rejected|pending_ai_review|check_something_wrong
  * @param {string} [status] - Optional filter by ai_status
  * @returns {Promise<{ data: Array, count: number }>}
  */
@@ -74,10 +89,23 @@ export async function approveListing(id) {
 }
 
 /**
- * Block a listing (Fraud Review). PATCH /api/listings/:id
+ * Reject a listing (Fraud Review). PATCH /api/listings/:id
+ * AI should use "reject" (not block) and show: listing rejected / check if something is wrong.
  */
-export async function blockListing(id) {
-  const res = await axios.patch(`${API_BASE}/api/listings/${id}`, { ai_status: 'blocked' }, {
+export async function rejectListing(id) {
+  const res = await axios.patch(`${API_BASE}/api/listings/${id}`, { ai_status: 'rejected' }, {
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    timeout: 15000,
+  });
+  return res.data;
+}
+
+/**
+ * Set listing to limited visibility (Fraud Review). PATCH /api/listings/:id
+ * AI message: limited visibility – check if something is wrong.
+ */
+export async function setLimitedVisibilityListing(id) {
+  const res = await axios.patch(`${API_BASE}/api/listings/${id}`, { ai_status: 'check_something_wrong' }, {
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     timeout: 15000,
   });
@@ -110,33 +138,57 @@ export async function getAdminPropertiesPost(params = {}) {
 
   let resBody;
   try {
-    const res = await axios.get(PROPERTIES_POST_URL, {
-      params: query,
-      headers: { Accept: 'application/json' },
+    const res = await axios.post(PROPERTIES_POST_URL, query, {
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       timeout: 20000,
     });
     resBody = res.data;
-  } catch (getErr) {
-    if (getErr.response?.status === 405 || getErr.response?.status === 404) {
-      const res = await axios.post(PROPERTIES_POST_URL, query, {
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+  } catch (postErr) {
+    if (postErr.response?.status === 405 || postErr.response?.status === 404) {
+      const res = await axios.get(PROPERTIES_POST_URL, {
+        params: query,
+        headers: { Accept: 'application/json' },
         timeout: 20000,
       });
       resBody = res.data;
     } else {
-      throw getErr;
+      throw postErr;
     }
   }
 
-  let raw = resBody?.data ?? resBody?.properties ?? resBody?.listings ?? resBody?.list;
-  if (!Array.isArray(raw) && raw && typeof raw === 'object' && Array.isArray(raw.data))
-    raw = raw.data;
-  if (!Array.isArray(raw)) raw = Array.isArray(resBody) ? resBody : [];
+  function extractList(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    if (Array.isArray(obj)) return obj;
+    if (obj.data && typeof obj.data === 'object' && Array.isArray(obj.data.properties))
+      return obj.data.properties;
+    const keys = ['data', 'properties', 'listings', 'list', 'items', 'result', 'results'];
+    for (const k of keys) {
+      const v = obj[k];
+      if (Array.isArray(v)) return v;
+      if (v && typeof v === 'object' && Array.isArray(v.data)) return v.data;
+      if (v && typeof v === 'object' && Array.isArray(v.properties)) return v.properties;
+    }
+    if (obj.data && typeof obj.data === 'object' && Array.isArray(obj.data.data))
+      return obj.data.data;
+    for (const k of Object.keys(obj)) {
+      if (Array.isArray(obj[k])) return obj[k];
+    }
+    return null;
+  }
+  let raw = extractList(resBody) ?? (Array.isArray(resBody) ? resBody : []);
   const list = Array.isArray(raw) ? raw.map(normalizeProperty) : [];
-  const total = resBody?.total ?? resBody?.count ?? list.length;
-  const current_page = resBody?.current_page ?? 1;
-  const last_page = resBody?.last_page ?? 1;
-  const per_page = resBody?.per_page ?? query.per_page;
+  const dataObj = resBody?.data && typeof resBody.data === 'object' ? resBody.data : resBody;
+  const pagination = dataObj?.pagination ?? resBody?.pagination;
+  const total =
+    pagination?.total ?? dataObj?.total ?? resBody?.total ?? dataObj?.count ?? resBody?.count ?? list.length;
+  const current_page = pagination?.current_page ?? dataObj?.current_page ?? resBody?.current_page ?? 1;
+  const per_page = pagination?.per_page ?? dataObj?.per_page ?? resBody?.per_page ?? query.per_page;
+  const last_page =
+    pagination?.last_page ??
+    pagination?.total_pages ??
+    dataObj?.last_page ??
+    resBody?.last_page ??
+    Math.max(1, Math.ceil(Number(total) / (per_page || 1)));
   return {
     data: list,
     count: total,

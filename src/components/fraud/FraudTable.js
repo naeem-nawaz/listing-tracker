@@ -10,7 +10,8 @@ function FraudTable({
   listings,
   onView,
   onApprove,
-  onBlock,
+  onReject,
+  onLimitedVisibility,
   processingId = null,
 }) {
   const formatPrice = (value) => {
@@ -73,7 +74,8 @@ function FraudTable({
                   listingId={row.id}
                   onView={onView}
                   onApprove={onApprove}
-                  onBlock={onBlock}
+                  onReject={onReject}
+                  onLimitedVisibility={onLimitedVisibility}
                   disabled={processingId !== null}
                   loading={processingId === row.id}
                 />

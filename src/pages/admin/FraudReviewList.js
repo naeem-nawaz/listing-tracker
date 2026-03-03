@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import FraudTable from '../../components/fraud/FraudTable';
 import { getFraudReviewListings } from '../../api/fraudApi';
-import { approveListing, blockListing } from '../../api/listingsApi';
+import { approveListing, rejectListing, setLimitedVisibilityListing } from '../../api/listingsApi';
 import '../../styles/FraudReviewList.css';
 
 const PAGE_SIZE = 5;
@@ -78,15 +78,33 @@ function FraudReviewList() {
     }
   };
 
-  const handleBlock = async (id) => {
+  const handleReject = async (id) => {
     setActionMessage({ type: '', text: '' });
     setProcessingId(id);
     try {
-      await blockListing(id);
-      setActionMessage({ type: 'success', text: 'Listing blocked.' });
+      await rejectListing(id);
+      setActionMessage({ type: 'success', text: 'Listing rejected.' });
       fetchListings();
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Failed to block.';
+      const msg = err.response?.data?.message || err.message || 'Failed to reject.';
+      setActionMessage({ type: 'error', text: msg });
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleLimitedVisibility = async (id) => {
+    setActionMessage({ type: '', text: '' });
+    setProcessingId(id);
+    try {
+      await setLimitedVisibilityListing(id);
+      setActionMessage({
+        type: 'success',
+        text: 'Limited visibility set. Please check if something is wrong.',
+      });
+      fetchListings();
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to set limited visibility.';
       setActionMessage({ type: 'error', text: msg });
     } finally {
       setProcessingId(null);
@@ -158,7 +176,8 @@ function FraudReviewList() {
                 listings={paginatedListings}
                 onView={handleView}
                 onApprove={handleApprove}
-                onBlock={handleBlock}
+                onReject={handleReject}
+                onLimitedVisibility={handleLimitedVisibility}
                 processingId={processingId}
               />
               <div className="fraud-pagination-wrap">

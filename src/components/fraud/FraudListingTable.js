@@ -50,7 +50,7 @@ function FraudListingTable({ listings, onView }) {
                 </span>
               </td>
               <td>
-                <AIStatusBadge status={row.ai_status} />
+                <AIStatusBadge status={row.ai_status} fraud_score={row.fraud_score} />
               </td>
               <td>
                 <button
