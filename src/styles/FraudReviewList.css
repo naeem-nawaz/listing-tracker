@@ -101,7 +101,7 @@
 /* ---- Main content card ---- */
 .fraud-content-card {
   background: #fff;
-  border-radius: 12px;
+  border-radius: 12px; 
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   padding: 0;
   margin-bottom: 1.5rem;
